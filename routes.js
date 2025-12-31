@@ -34,9 +34,10 @@ routes.post("/person", async (req, res) => {
       ...data,
     });
   } catch (err) {
-    if (err.errors) return res.status(400).json({ errors: err.errors });
-
-    console.error(err);
+    if (err.errors) {
+      console.log(err.errors);
+      return res.status(400).json({ errors: err.errors });
+    }
     return res.status(500).json({ message: "Internal error." });
   }
 });
