@@ -12,4 +12,6 @@ const personSchema = z.object({
   salary: z.coerce.number().positive().optional(),
 });
 
-module.exports = { personSchema };
+const updatePersonSchema = personSchema.partial();
+
+module.exports = { personSchema, updatePersonSchema };
