@@ -18,6 +18,14 @@ routes.get("/", async (req, res) => {
 routes.post("/person", async (req, res) => {
   try {
     const data = personSchema.parse(req.body);
+
+    const [exists] = await pool.query("SELECT id FROM person WHERE email = ?", [
+      data.email.trim(),
+    ]);
+
+    if (exists.length)
+      return res.status(409).json({ message: "Email already in use." });
+
     const [result] = await pool.query(
       `INSERT INTO person (name, email, height, weight, is_working, salary) VALUES (?,?,?,?,?,?)`,
       [
