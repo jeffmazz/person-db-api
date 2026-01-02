@@ -1,6 +1,7 @@
 const express = require("express");
 const pool = require("./db");
 const { personSchema } = require("./schemas");
+const { ZodError } = require("zod");
 
 const routes = express.Router();
 
@@ -20,8 +21,8 @@ routes.post("/person", async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO person (name, email, height, weight, is_working, salary) VALUES (?,?,?,?,?,?)`,
       [
-        data.name,
-        data.email,
+        data.name.trim(),
+        data.email.trim(),
         data.height,
         data.weight,
         data.isWorking,
@@ -34,10 +35,18 @@ routes.post("/person", async (req, res) => {
       ...data,
     });
   } catch (err) {
-    if (err.errors) {
-      console.log(err.errors);
-      return res.status(400).json({ errors: err.errors });
+    if (err instanceof ZodError) {
+      const formattedError = err.issues.map((e) => {
+        return {
+          field: e.path[0],
+          message: e.message,
+        };
+      });
+      console.log("Zod validation error:", err.issues);
+      return res.status(400).json({ errors: formattedError });
     }
+
+    console.error("Server error", err);
     return res.status(500).json({ message: "Internal error." });
   }
 });
