@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("./db");
 const { personSchema, updatePersonSchema } = require("./schemas");
 const { ZodError } = require("zod");
+const { personExists } = require("./middlewares/personExists");
 
 const routes = express.Router();
 
@@ -15,25 +16,8 @@ routes.get("/", async (req, res) => {
   }
 });
 
-routes.get("/person/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-
-    if (!Number.isInteger(id) || id <= 0)
-      return res.status(400).json({ error: "Invalid id." });
-
-    const [rows] = await pool.query("SELECT * FROM person WHERE id = ?", [id]);
-
-    if (!rows.length)
-      return res.status(404).json({ error: "Person not found." });
-
-    const user = rows[0];
-
-    return res.status(200).json({ user });
-  } catch (err) {
-    console.error("GET /person/:id error", err);
-    return res.status(500).json({ error: "Internal error." });
-  }
+routes.get("/person/:id", personExists, async (req, res) => {
+  return res.status(200).json({ user: req.person });
 });
 
 routes.post("/person", async (req, res) => {
@@ -158,29 +142,18 @@ routes.put("/person/:id", async (req, res) => {
   }
 });
 
-routes.delete("/person/:id", async (req, res) => {
+routes.delete("/person/:id", personExists, async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const [result] = await pool.query("DELETE FROM person WHERE id = ?", [
+      req.person.id,
+    ]);
 
-    if (!Number.isInteger(id) || id <= 0)
-      return res.status(400).json({ error: "Invalid id." });
-
-    const [rows] = await pool.query("SELECT * FROM person WHERE id = ?", [id]);
-
-    if (!rows.length)
-      return res.status(404).json({ error: "Person not found." });
-
-    const user = rows[0];
-
-    const [result] = await pool.query("DELETE FROM person WHERE id = ?", [id]);
-
-    if (result.affectedRows === 0)
+    if (!result.affectedRows)
       return res.status(500).json({ error: "Delete failed unexpectedly" });
 
-    console.log({ message: "User deleted successfully!", user });
     return res
       .status(200)
-      .json({ message: "User deleted successfully!", user });
+      .json({ message: "User deleted successfully!", user: req.person });
   } catch (err) {
     console.error("DELETE /person error:", err);
     return res.status(500).json({ message: "Internal error." });
