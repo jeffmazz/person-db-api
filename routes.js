@@ -64,7 +64,7 @@ routes.post("/person", async (req, res) => {
   }
 });
 
-routes.put("/person/:id", async (req, res) => {
+routes.put("/person/:id", personExists, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
@@ -74,15 +74,7 @@ routes.put("/person/:id", async (req, res) => {
         .json({ message: "At least one field must be provided." });
 
     const data = updatePersonSchema.parse(req.body);
-
-    const [personRows] = await pool.query("SELECT * FROM person WHERE id = ?", [
-      id,
-    ]);
-
-    if (!personRows.length)
-      return res.status(404).json({ message: "Person not found." });
-
-    const person = personRows[0];
+    const person = req.person;
 
     const dbData = { ...data };
 
@@ -117,10 +109,10 @@ routes.put("/person/:id", async (req, res) => {
 
     const values = Object.values(dbData);
 
-    const [result] = await pool.query(
-      `UPDATE person SET ${fields} WHERE id = ?`,
-      [...values, id]
-    );
+    await pool.query(`UPDATE person SET ${fields} WHERE id = ?`, [
+      ...values,
+      id,
+    ]);
 
     return res
       .status(200)
