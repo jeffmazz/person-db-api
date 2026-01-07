@@ -1,18 +1,17 @@
 const express = require("express");
 const pool = require("./db");
 const { personSchema, updatePersonSchema } = require("./schemas");
-const { ZodError } = require("zod");
 const { personExists } = require("./middlewares/personExists");
+const { handleErrors } = require("./middlewares/handleErrors");
 
 const routes = express.Router();
 
-routes.get("/", async (req, res) => {
+routes.get("/", async (req, res, next) => {
   try {
     const [rows] = await pool.query("SELECT * FROM person");
-    return res.status(200).json({ rows });
+    return res.status(200).json({ people: rows });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "Internal Error" });
+    next(err);
   }
 });
 
@@ -20,7 +19,7 @@ routes.get("/person/:id", personExists, async (req, res) => {
   return res.status(200).json({ user: req.person });
 });
 
-routes.post("/person", async (req, res) => {
+routes.post("/person", async (req, res, next) => {
   try {
     const data = personSchema.parse(req.body);
 
@@ -48,23 +47,11 @@ routes.post("/person", async (req, res) => {
       ...data,
     });
   } catch (err) {
-    if (err instanceof ZodError) {
-      const errors = err.issues.map((e) => {
-        return {
-          field: e.path[0],
-          message: e.message,
-        };
-      });
-      console.log("Zod validation error:", err.issues);
-      return res.status(400).json({ errors });
-    }
-
-    console.error("Server error", err);
-    return res.status(500).json({ message: "Internal error." });
+    next(err);
   }
 });
 
-routes.put("/person/:id", personExists, async (req, res) => {
+routes.put("/person/:id", personExists, async (req, res, next) => {
   try {
     const id = Number(req.params.id);
 
@@ -118,38 +105,27 @@ routes.put("/person/:id", personExists, async (req, res) => {
       .status(200)
       .json({ message: "Person updated successfully!", id, ...data });
   } catch (err) {
-    if (err instanceof ZodError) {
-      const errors = err.issues.map((e) => {
-        return {
-          field: e.path[0],
-          message: e.message,
-        };
-      });
-      console.log("Zod validation error: ", err.issues);
-      return res.status(400).json({ errors });
-    }
-
-    console.error(err);
-    return res.status(500).json({ message: "Internal error." });
+    next(err);
   }
 });
 
-routes.delete("/person/:id", personExists, async (req, res) => {
+routes.delete("/person/:id", personExists, async (req, res, next) => {
   try {
     const [result] = await pool.query("DELETE FROM person WHERE id = ?", [
       req.person.id,
     ]);
 
     if (!result.affectedRows)
-      return res.status(500).json({ error: "Delete failed unexpectedly" });
+      return res.status(404).json({ error: "Person not found." });
 
     return res
       .status(200)
       .json({ message: "User deleted successfully!", user: req.person });
   } catch (err) {
-    console.error("DELETE /person error:", err);
-    return res.status(500).json({ message: "Internal error." });
+    next(err);
   }
 });
+
+routes.use(handleErrors);
 
 module.exports = routes;
